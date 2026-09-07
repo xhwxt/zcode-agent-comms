@@ -1,6 +1,6 @@
 ---
 name: agent-comms
-description: 主代理派发 worker 子代理并需要实时收流/监督时使用：如何生成 comms 频道、派发 prompt 必须写哪两行、如何用 wait_worker_event 形成"等待-处理"循环、超时沉默怎么处置。当需要并行多个 worker、长任务进度监督、或用户要求实时汇报时触发。
+description: 主代理派发 worker 子代理并需要实时收流/监督时使用：如何生成 comms 频道、派发 prompt 必须写哪两行、如何用 wait_worker_event 形成"等待-处理"循环、超时沉默怎么处置。当需要并行多个 worker、长任务进度监督、或用户要求实时汇报时触发。Use when dispatching worker subagents that need real-time streaming/supervision: channel creation, the two required dispatch-prompt lines, the wait_worker_event loop, and silence handling. Triggers on parallel workers, long-task progress monitoring, or real-time progress reporting.
 ---
 
 # agent-comms 协调者协议
@@ -11,7 +11,12 @@ description: 主代理派发 worker 子代理并需要实时收流/监督时使�
 
 ## 派发
 
-用 Agent 工具派发，`subagent_type` 填 `agent-comms:worker`（用全名）。每个派发 prompt 的开头必须包含两行：
+用 Agent 工具派发，`subagent_type` 按任务性质二选一（用全名）：
+
+- **`agent-comms:worker`**——执行型（全工具：改代码/跑管线/动文件/联网/浏览器；已硬排除频道消费与孙代理派生）。改东西的任务用它。
+- **`agent-comms:scout`**——只读核查型（检索/读取/联网核实，不修改任何文件）。查证、勘察、交叉核验的任务用它。
+
+每个派发 prompt 的开头必须包含两行：
 
 ```
 comms 频道 <channel>

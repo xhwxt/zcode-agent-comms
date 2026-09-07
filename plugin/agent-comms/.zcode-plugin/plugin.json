@@ -1,7 +1,11 @@
 {
   "name": "agent-comms",
-  "version": "0.2.1",
-  "description": "主/子代理实时互通插件：自带 worker 类型（三层边界汇报协议随系统提示词注入）+ open_channel/report/wait_worker_event/read_events 四个 MCP 工具（随机频道防串台、任意 worker 聚合等待、服务端节流、沉默检测、锚工件落盘可审计）。开发方案见工作区 docs/子代理沟通-开发方案-2026-09-08.md。",
+  "version": "0.2.2",
+  "description": "Real-time main/subagent communication for ZCode: bundled worker (full-tools executor) and scout (read-only recon) agent types with a three-boundary reporting protocol baked into their system prompts, plus open_channel/report/wait_worker_event/read_events MCP tools (collision-proof channels, wait-any-worker, server-side throttle, silence detection, auditable anchor artifacts).",
+  "description_i18n": {
+    "en": "Real-time main/subagent communication: bundled worker (full-tools executor) and scout (read-only recon) types with the reporting protocol baked in, plus open_channel/report/wait_worker_event/read_events MCP tools for wait-any-worker, silence detection and auditable anchor artifacts.",
+    "zh-CN": "主/子代理实时互通：自带 worker（全工具执行型）与 scout（只读核查型）两个 agent 类型，三层边界汇报协议随系统提示词注入；配套 open_channel/report/wait_worker_event/read_events 四个 MCP 工具，实现随机频道防串台、任意 worker 聚合等待、服务端节流、沉默检测与锚工件落盘审计。"
+  },
   "skills": "skills",
   "mcpServers": {
     "comms": {
