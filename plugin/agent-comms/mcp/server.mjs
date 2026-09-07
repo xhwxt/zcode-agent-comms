@@ -20,11 +20,14 @@ import crypto from 'node:crypto';
 
 const SPOOL_ROOT = process.env.AGENT_COMMS_SPOOL_ROOT
   || path.join(os.homedir(), '.zcode', 'agent-comms', 'spool');
-const VERSION = '0.2.0';
+const VERSION = '0.2.4';
 const POLL_MS = 400;
 const WAIT_DEFAULT_MS = 60000;
 const WAIT_MAX_MS = 240000; // 必须小于 plugin.json 的 timeoutMs(600000)，留清理余量
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+// Windows 保留设备名与结尾点会致目录不可用/别名合并，一律拒绝
+const WIN_RESERVED_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+const validName = (s) => NAME_RE.test(s) && !WIN_RESERVED_RE.test(s) && !s.endsWith('.');
 const SLUG_RE = /^[A-Za-z0-9._-]{0,40}$/;
 const KINDS = ['milestone', 'blocked', 'done'];
 const THROTTLE_MS = 2000; // 同一 worker 两次非 done 汇报的最小间隔（服务端硬边界）
@@ -82,15 +85,15 @@ function workersInChannel(ch) {
 class ToolError extends Error {}
 function checkChannel(p) {
   const ch = typeof p?.channel === 'string' ? p.channel.trim() : '';
-  if (!NAME_RE.test(ch)) {
-    throw new ToolError(`channel 必填，且只能含字母数字._-（长度 1-64），收到: ${JSON.stringify(p?.channel)}`);
+  if (!validName(ch)) {
+    throw new ToolError(`channel 必填，且只能含字母数字._-、非 Windows 保留名、不以点结尾（长度 1-64），收到: ${JSON.stringify(p?.channel)}`);
   }
   return ch;
 }
 function checkWorker(p) {
   const w = typeof p?.worker === 'string' ? p.worker.trim() : '';
-  if (!NAME_RE.test(w)) {
-    throw new ToolError(`worker 必填，且只能含字母数字._-（长度 1-64），收到: ${JSON.stringify(p?.worker)}`);
+  if (!validName(w)) {
+    throw new ToolError(`worker 必填，且只能含字母数字._-、非 Windows 保留名、不以点结尾（长度 1-64），收到: ${JSON.stringify(p?.worker)}`);
   }
   return w;
 }
@@ -121,7 +124,13 @@ function doReport(p) {
   const summary = typeof p.summary === 'string' ? p.summary.trim() : '';
   if (!summary) throw new ToolError('summary 必填（≤200 字的事件摘要）');
   if (summary.length > 200) throw new ToolError(`summary 超长（${summary.length} > 200 字），请压缩`);
-  const kind = KINDS.includes(p.kind) ? p.kind : 'milestone';
+  let kind = 'milestone';
+  if (p?.kind !== undefined && p.kind !== '') {
+    if (!KINDS.includes(p.kind)) {
+      throw new ToolError(`kind 只能是 ${KINDS.join('/')} 之一（缺省为 milestone），收到: ${JSON.stringify(p.kind)}`);
+    }
+    kind = p.kind;
+  }
   const message = typeof p.message === 'string' ? p.message.slice(0, 20000) : undefined;
 
   if (kind !== 'done') {

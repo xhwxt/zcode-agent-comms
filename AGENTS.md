@@ -10,7 +10,7 @@
 - 本工作区已 `git init`，首个落地代码是子代理沟通插件 **agent-comms v0.2.0（P1 MVP + P2 打磨均已实测通过）**。开发方案与验证记录见 [docs/子代理沟通-开发方案-2026-09-08.md](docs/子代理沟通-开发方案-2026-09-08.md)。
 - **目录结构**：`plugin/`（本地市场根，marketplace.json）＋ `plugin/agent-comms/`（插件本体：agents/worker.md 协议注入、mcp/server.mjs 三个工具、skills/ 协调者协议）；`tests/headless_run.py`（headless 场景测试运行器）；`docs/`（方案与调研）。
 - **测试命令**（headless 场景测试，密钥运行时读取不入库）：`python tests/headless_run.py "<单行 prompt>"`；插件侧功能测试=派发 `agent-comms:worker` 后对 `C:\Users\<用户>\.zcode\agent-comms\spool\<频道>\` 做文件系统侧独立核验（unread→read 消费语义）。
-- **开发期安装状态**：插件以本地市场方式装在用户级（`installed_plugins.json` 条目 agent-comms@kanban-local + `cli/config.json` 的 enabledPlugins/extraKnownMarketplaces 指向本仓库 plugin/ 目录）；headless 所需的 provider/model 段也写在 cli/config.json（配方见方案文档 §3.4）。**改动 plugin/ 下文件即时生效，无需重装**（installPath 直指仓库）。去留待用户裁定。
+- **开发期安装状态**：插件以本地市场方式装在用户级（`installed_plugins.json` 条目 agent-comms@zcode-agent-comms + `cli/config.json` 的 enabledPlugins/extraKnownMarketplaces 指向本仓库根的 marketplace.json）；他人可走官方流程安装（插件管理 → 发现 → 粘贴 https://github.com/xhwxt/zcode-agent-comms）。**改动 plugin/ 下文件即时生效，无需重装**（installPath 直指仓库）。
 - 项目方向已由用户确认：**自研任务看板，第一阶段支持 ZCode，后期扩充 Codex、Hermes Agent**。
 - 前期调研已完成，见 [docs/调研笔记-2026-09-06.md](docs/调研笔记-2026-09-06.md)：含 ZCode 三层数据源（`~/.zcode/v2/tasks-index.sqlite`、`~/.zcode/cli/db/db.sqlite` 的 session/todo/usage 表、文件+原子锁协议先例）与 GitHub 高星同类项目对比；改数据读取逻辑前先读它。
 - 产品形态已定：**Web 起步，独立本机服务**；交互模型为"人发任务 → 看板调 AI 拆解 → agent 自主接单执行 → 人验收"。需求拆解见 [docs/需求拆解草案-2026-09-06.md](docs/需求拆解草案-2026-09-06.md)。

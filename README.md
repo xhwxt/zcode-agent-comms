@@ -72,4 +72,4 @@ ZCode 内核已有硬管道（SendMessage 可 steer 运行中的子代理；子�
 
 ## Status / 状态
 
-v0.2.2. Works on ZCode desktop + headless CLI（Windows 先行）. Roadmap: portable MCP path, spawn preflight, board integration (mailbox pump for comment relays).
+v0.2.4. Works on ZCode desktop + headless CLI（Windows 先行）. Roadmap: per-channel report authentication, spool retention/cleanup, spawn preflight, board integration (mailbox pump for comment relays).
