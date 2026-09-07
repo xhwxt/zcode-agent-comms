@@ -1,13 +1,17 @@
 // agent-comms MCP stdio server — 主/子代理实时互通插件核心
 //
-// 三个工具（协议细节见各 inputSchema.description，会随每次请求重发）：
-//   report            子代理例行汇报 → 写锚工件事件文件（原子写入）
+// 四个工具（协议细节见各 inputSchema.description，会随每次请求重发）：
+//   open_channel      协调者开频道（slug+随机后缀，防多会话并发串台）
+//   report            子代理例行汇报 → 写锚工件事件文件（原子写入，服务端节流）
 //   wait_worker_event 协调者阻塞等"任意 worker"事件 + 超时摘要（沉默检测）
 //   read_events       回看频道历史事件（断线补读）
 //
 // 存储语义（与 ZCode 内置会话邮箱同款）：spool/<channel>/unread/*.json，
 // wait 抽干 unread（rename 到 read/）后返回——派发后、等待前到达的事件不丢失。
 // 事件文件名 = 15 位零填充毫秒时间戳-随机后缀.json，字典序即时间序。
+//
+// v0.2.0：open_channel 防串台；report 服务端节流（非 done 每 worker ≥2s）；
+//         wait 支持按 worker 过滤；超时摘要含各 worker 最后事件时间。
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,11 +20,14 @@ import crypto from 'node:crypto';
 
 const SPOOL_ROOT = process.env.AGENT_COMMS_SPOOL_ROOT
   || path.join(os.homedir(), '.zcode', 'agent-comms', 'spool');
+const VERSION = '0.2.0';
 const POLL_MS = 400;
 const WAIT_DEFAULT_MS = 60000;
 const WAIT_MAX_MS = 240000; // 必须小于 plugin.json 的 timeoutMs(600000)，留清理余量
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const SLUG_RE = /^[A-Za-z0-9._-]{0,40}$/;
 const KINDS = ['milestone', 'blocked', 'done'];
+const THROTTLE_MS = 2000; // 同一 worker 两次非 done 汇报的最小间隔（服务端硬边界）
 
 const send = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -50,15 +57,24 @@ function atomicWriteJson(file, obj) {
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, file);
 }
-function workersInChannel(ch) {
-  const s = new Set();
-  for (const sub of ['unread', 'read']) {
-    for (const f of listEventFiles(chDir(ch, sub))) {
-      const ev = readEvent(chDir(ch, sub), f);
-      if (ev?.worker) s.add(ev.worker);
-    }
+function allEventFiles(ch) {
+  return [
+    ...listEventFiles(chDir(ch, 'unread')).map((f) => [chDir(ch, 'unread'), f]),
+    ...listEventFiles(chDir(ch, 'read')).map((f) => [chDir(ch, 'read'), f]),
+  ];
+}
+function workerLastEvents(ch) {
+  const last = new Map(); // worker -> {kind, at, ts}
+  for (const [dir, f] of allEventFiles(ch)) {
+    const ev = readEvent(dir, f);
+    if (!ev?.worker) continue;
+    const prev = last.get(ev.worker);
+    if (!prev || ev.ts > prev.ts) last.set(ev.worker, { kind: ev.kind, at: ev.at, ts: ev.ts });
   }
-  return [...s].sort();
+  return last;
+}
+function workersInChannel(ch) {
+  return [...workerLastEvents(ch).keys()].sort();
 }
 
 // ---------- 参数校验 ----------
@@ -78,8 +94,26 @@ function checkWorker(p) {
   }
   return w;
 }
+function optionalWorker(p) {
+  if (p?.worker === undefined || p?.worker === null || p?.worker === '') return undefined;
+  return checkWorker(p);
+}
 
 // ---------- 工具实现 ----------
+
+function doOpenChannel(p) {
+  let slug = typeof p?.slug === 'string' ? p.slug.trim() : '';
+  if (!SLUG_RE.test(slug)) {
+    throw new ToolError(`slug 只能含字母数字._-且 ≤40 字符（可省略），收到: ${JSON.stringify(p?.slug)}`);
+  }
+  if (!slug) slug = 'ch';
+  const ch = `${slug}-${crypto.randomBytes(3).toString('hex')}`;
+  ensureDirs(ch);
+  return {
+    channel: ch, spool: path.join(SPOOL_ROOT, ch),
+    note: '把此频道名写进每个派发 prompt 的「comms 频道」行；wait/read 用同名。',
+  };
+}
 
 function doReport(p) {
   const ch = checkChannel(p);
@@ -89,6 +123,15 @@ function doReport(p) {
   if (summary.length > 200) throw new ToolError(`summary 超长（${summary.length} > 200 字），请压缩`);
   const kind = KINDS.includes(p.kind) ? p.kind : 'milestone';
   const message = typeof p.message === 'string' ? p.message.slice(0, 20000) : undefined;
+
+  if (kind !== 'done') {
+    const last = workerLastEvents(ch).get(worker);
+    if (last && Date.now() - last.ts < THROTTLE_MS) {
+      throw new ToolError(
+        `节流：worker ${worker} 距上次汇报不足 ${THROTTLE_MS / 1000} 秒。请把要点合并成一条再报，或等取得实质进展后再报（kind="done" 不受此限）。`,
+      );
+    }
+  }
 
   ensureDirs(ch);
   const now = Date.now();
@@ -101,6 +144,7 @@ function doReport(p) {
 
 async function doWait(p) {
   const ch = checkChannel(p);
+  const onlyWorker = optionalWorker(p);
   const req = Number(p?.timeout_ms);
   const timeoutMs = Math.max(1000, Math.min(WAIT_MAX_MS, Number.isFinite(req) ? req : WAIT_DEFAULT_MS));
   ensureDirs(ch);
@@ -110,9 +154,15 @@ async function doWait(p) {
   for (;;) {
     const unreadDir = chDir(ch, 'unread');
     const files = listEventFiles(unreadDir);
-    if (files.length > 0) {
+    const matching = [];
+    for (const f of files) {
+      if (onlyWorker === undefined) { matching.push([f, null]); continue; }
+      const ev = readEvent(unreadDir, f);
+      if (ev?.worker === onlyWorker) matching.push([f, ev]);
+    }
+    if (matching.length > 0) {
       const events = [];
-      for (const f of files) {
+      for (const [f] of matching) {
         try {
           fs.renameSync(path.join(unreadDir, f), path.join(chDir(ch, 'read'), f));
           const ev = readEvent(chDir(ch, 'read'), f);
@@ -123,14 +173,20 @@ async function doWait(p) {
         return {
           status: 'events', timed_out: false, waited_ms: Date.now() - startedAt,
           events, workers_in_channel: workersInChannel(ch),
+          ...(onlyWorker !== undefined ? { filtered: `仅返回 worker=${onlyWorker} 的事件，其它 worker 事件仍在 unread` } : {}),
         };
       }
     }
     if (Date.now() >= deadline) {
+      const lastEvents = workerLastEvents(ch);
+      const worker_last_event = {};
+      for (const [w, v] of [...lastEvents.entries()].sort()) {
+        worker_last_event[w] = { kind: v.kind, at: v.at, age_ms: Date.now() - v.ts };
+      }
       return {
         status: 'timeout', timed_out: true, waited_ms: Date.now() - startedAt, events: [],
-        workers_in_channel: workersInChannel(ch),
-        hint: '沉默检测：等待期内无任何 worker 新事件。对照 workers_in_channel 判断谁没动静；若已超出预期完成时间，可 SendMessage 质询该 worker，或确认其是否已结束/中断。',
+        workers_in_channel: workersInChannel(ch), worker_last_event,
+        hint: '沉默检测：等待期内无任何 worker 新事件。对照 worker_last_event 的 age_ms 判断谁最久没动静；对超期无响应的 worker 可 SendMessage 质询（如「报告当前进度与阻塞点」），或用转录核实配方查其实际工具调用；确认其是否已结束/中断。',
       };
     }
     await sleep(POLL_MS);
@@ -152,8 +208,19 @@ function doRead(p) {
 
 const TOOLS = [
   {
+    name: 'open_channel',
+    description: '【协调者用】开一个新 comms 频道：返回带随机后缀的频道名。每次派发任务批次前必须先调用本工具，把返回的频道名写进每个 worker 派发 prompt 的「comms 频道」行——随机后缀保证多个主会话并发时频道不会串台。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: { type: 'string', description: '可选的任务标识前缀（字母数字._-，≤40 字符），如 fix-login' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'report',
-    description: '【worker 用】例行汇报：把里程碑/进度/结果写成锚工件事件落盘，供协调者用 wait_worker_event 聚合等待。节流规则：两次 report 之间至少间隔 5 个工具调用；summary ≤200 字。紧急事项（验收标准要变/继续做会产生无效功/不可逆操作/外部阻塞超期）不要用本工具，直接调 RespondToCoordinator。任务结束必须 report 一次 kind="done"。',
+    description: '【worker 用】例行汇报：把里程碑/进度/结果写成锚工件事件落盘，供协调者用 wait_worker_event 聚合等待。节流规则：两次 report 之间至少间隔 5 个工具调用，服务端对非 done 汇报强制 2 秒最小间隔（违者报错）；summary ≤200 字。紧急事项（验收标准要变/继续做会产生无效功/不可逆操作/外部阻塞超期）不要用本工具，直接调 RespondToCoordinator。任务结束必须 report 一次 kind="done"。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -169,12 +236,13 @@ const TOOLS = [
   },
   {
     name: 'wait_worker_event',
-    description: '【协调者用】阻塞等待任意 worker 的新事件（里程碑/blocked/done），有事件立即返回事件数组；超时返回沉默摘要。派发后应尽快调用本工具形成"等待-处理"循环：单次最长 240000ms，没等齐所有 worker 就再次调用。返回的 events 已从频道"抽走"（下次不重复返回），历史可用 read_events 回看。',
+    description: '【协调者用】阻塞等待任意 worker 的新事件（里程碑/blocked/done），有事件立即返回事件数组；超时返回沉默摘要（含各 worker 最后事件时间）。派发后应尽快调用本工具形成"等待-处理"循环：单次最长 240000ms，没等齐所有 worker 就再次调用。返回的 events 已从频道"抽走"（下次不重复返回），历史可用 read_events 回看。可传 worker 只等指定 worker（其它 worker 事件留在频道内不被消费）。',
     inputSchema: {
       type: 'object',
       properties: {
         channel: { type: 'string', description: 'comms 频道，与派发时写给 worker 的一致' },
         timeout_ms: { type: 'number', description: '本次最长阻塞毫秒数，默认 60000，上限 240000；到点返回沉默摘要，可循环再调' },
+        worker: { type: 'string', description: '可选，只等该 worker 的事件' },
       },
       required: ['channel'],
       additionalProperties: false,
@@ -210,7 +278,7 @@ rl.on('line', (line) => {
     send({ jsonrpc: '2.0', id, result: {
       protocolVersion: params?.protocolVersion ?? '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'agent-comms', version: '0.1.0' },
+      serverInfo: { name: 'agent-comms', version: VERSION },
     } });
   } else if (method === 'tools/list') {
     send({ jsonrpc: '2.0', id, result: { tools: TOOLS } });
@@ -220,7 +288,8 @@ rl.on('line', (line) => {
     (async () => {
       try {
         let result;
-        if (name === 'report') result = doReport(args);
+        if (name === 'open_channel') result = doOpenChannel(args);
+        else if (name === 'report') result = doReport(args);
         else if (name === 'wait_worker_event') result = await doWait(args);
         else if (name === 'read_events') result = doRead(args);
         else {
@@ -238,4 +307,4 @@ rl.on('line', (line) => {
   }
 });
 process.stdin.on('end', () => process.exit(0));
-process.stderr.write(`[agent-comms] stdio MCP server started, spool=${SPOOL_ROOT}\n`);
+process.stderr.write(`[agent-comms] stdio MCP server v${VERSION} started, spool=${SPOOL_ROOT}\n`);

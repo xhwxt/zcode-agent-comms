@@ -13,9 +13,25 @@
         "en": "Real-time main/subagent communication: bundled worker type with reporting protocol baked into its system prompt, plus wait-any-worker MCP tool with timeout summaries.",
         "zh-CN": "主/子代理实时互通：worker 类型自带三层边界汇报协议（随系统提示词注入），配套 report/wait_worker_event/read_events 工具实现任意 worker 聚合等待、沉默检测与锚工件审计。"
       },
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": { "name": "kanban-project" },
       "source": "./agent-comms"
+    },
+    {
+      "name": "ponytail",
+      "displayName": "Ponytail",
+      "displayName_i18n": {
+        "en": "Ponytail",
+        "zh-CN": "Ponytail 懒惰模式"
+      },
+      "description": "Lazy senior dev mode: forces the simplest, shortest solution that actually works - YAGNI, stdlib first, no unrequested abstractions. Packaged from DietrichGebert/ponytail v4.9.0 (skills only).",
+      "description_i18n": {
+        "en": "Lazy senior dev mode: forces the simplest, shortest solution that actually works - YAGNI, stdlib first, no unrequested abstractions. Packaged from DietrichGebert/ponytail v4.9.0 (skills only).",
+        "zh-CN": "「懒惰资深程序员」模式：写代码前先走懒惰阶梯（YAGNI → 代码库已有 → 标准库 → 平台原生 → 已装依赖 → 一行搞定 → 最小可用实现），拒绝过度设计与无谓抽象，但不牺牲安全、校验与无障碍。含主模式（三档强度）、diff 过度设计审查、全仓库审计、简化债务台账、收益看板、帮助卡片共 6 个技能。打包自 DietrichGebert/ponytail v4.9.0。"
+      },
+      "version": "4.9.0",
+      "author": { "name": "Dietrich Gebert" },
+      "source": "./ponytail"
     }
   ]
 }

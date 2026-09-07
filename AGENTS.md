@@ -7,7 +7,7 @@
 
 ## 当前状态（2026-09-08 更新）
 
-- 本工作区已 `git init`，首个落地代码是子代理沟通插件 **agent-comms v0.1.0（P1 MVP 已实测通过）**。开发方案与验证记录见 [docs/子代理沟通-开发方案-2026-09-08.md](docs/子代理沟通-开发方案-2026-09-08.md)。
+- 本工作区已 `git init`，首个落地代码是子代理沟通插件 **agent-comms v0.2.0（P1 MVP + P2 打磨均已实测通过）**。开发方案与验证记录见 [docs/子代理沟通-开发方案-2026-09-08.md](docs/子代理沟通-开发方案-2026-09-08.md)。
 - **目录结构**：`plugin/`（本地市场根，marketplace.json）＋ `plugin/agent-comms/`（插件本体：agents/worker.md 协议注入、mcp/server.mjs 三个工具、skills/ 协调者协议）；`tests/headless_run.py`（headless 场景测试运行器）；`docs/`（方案与调研）。
 - **测试命令**（headless 场景测试，密钥运行时读取不入库）：`python tests/headless_run.py "<单行 prompt>"`；插件侧功能测试=派发 `agent-comms:worker` 后对 `C:\Users\<用户>\.zcode\agent-comms\spool\<频道>\` 做文件系统侧独立核验（unread→read 消费语义）。
 - **开发期安装状态**：插件以本地市场方式装在用户级（`installed_plugins.json` 条目 agent-comms@kanban-local + `cli/config.json` 的 enabledPlugins/extraKnownMarketplaces 指向本仓库 plugin/ 目录）；headless 所需的 provider/model 段也写在 cli/config.json（配方见方案文档 §3.4）。**改动 plugin/ 下文件即时生效，无需重装**（installPath 直指仓库）。去留待用户裁定。
