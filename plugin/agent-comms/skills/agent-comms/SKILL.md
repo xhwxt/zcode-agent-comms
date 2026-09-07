@@ -25,6 +25,8 @@ worker 名 <worker-N>
 派发后尽快调用 `mcp__plugin_agent-comms_comms__wait_worker_event({channel, timeout_ms})`：
 
 - 单次最长阻塞 240000ms；**没等齐就再次调用**，形成"等待→处理→再等待"循环。
+- **并发建议**：一批 worker ≤3 个——过多并行代理徒增成本与噪声，也容易撞平台并发上限。
+- **长批次的省 token 模式**：不需要紧盯进度时，可以不挂 wait——把 worker 全部后台派发后直接结束本回合，后台代理的完成通知与紧急消息会唤醒你；把 wait 循环留给需要主动监督的阶段，避免纯等待回合空烧上下文。
 - 返回 `status="events"`：逐条处理 `events`——`kind="done"` 表示该 worker 完成；`kind="blocked"` 需要你决策（留言纠偏可对其 SendMessage steer）。
 - 返回 `status="timeout"`：沉默检测命中，按下节处置。
 - 已消费的事件不会重复返回；需要回看历史用 `read_events({channel})`。需要专等某个 worker 时传 `worker` 参数（其它 worker 事件不被消费）。

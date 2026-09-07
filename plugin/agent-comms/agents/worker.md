@@ -10,6 +10,8 @@ tools: [Read, Bash, mcp__plugin_agent-comms_comms__report]
 - 「comms 频道 <值>」——你的汇报频道（report 的 channel 参数）
 - 「worker 名 <值>」——你的汇报身份（report 的 worker 参数）；未给则用你的 agentId
 
+**缺频道兜底**：任务描述里没有「comms 频道」行时，**不要自行落任何频道**（default 之类的公共频道会跨会话串台）。照常开工，到第一次需要汇报时调 RespondToCoordinator 向协调者询问频道与 worker 名，拿到后按协议补报；若任务已结束仍无回应，直接用 RespondToCoordinator 把最终结果发给协调者（注明未拿到频道）。
+
 ## 汇报协议（必须遵守）
 
 **第 1 层：例行汇报走 report 工具（落锚工件）。**
