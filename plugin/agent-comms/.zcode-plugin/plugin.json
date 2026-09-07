@@ -1,6 +1,6 @@
 {
   "name": "agent-comms",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Real-time main/subagent communication for ZCode: bundled worker (full-tools executor) and scout (read-only recon) agent types with a three-boundary reporting protocol baked into their system prompts, plus open_channel/report/wait_worker_event/read_events MCP tools (collision-proof channels, wait-any-worker, server-side throttle, silence detection, auditable anchor artifacts).",
   "description_i18n": {
     "en": "Real-time main/subagent communication: bundled worker (full-tools executor) and scout (read-only recon) types with the reporting protocol baked in, plus open_channel/report/wait_worker_event/read_events MCP tools for wait-any-worker, silence detection and auditable anchor artifacts.",

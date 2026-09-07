@@ -16,6 +16,8 @@ description: 主代理派发 worker 子代理并需要实时收流/监督时使�
 - **`agent-comms:worker`**——执行型（全工具：改代码/跑管线/动文件/联网/浏览器；已硬排除频道消费与孙代理派生）。改东西的任务用它。
 - **`agent-comms:scout`**——只读核查型（检索/读取/联网核实，不修改任何文件）。查证、勘察、交叉核验的任务用它。
 
+**混派非插件类型时**（如 agentA/agentsDS/general-purpose）：它们默认**不经频道**——进度只会经完成通知或 RespondToCoordinator 到达，不会出现在频道事件里，别等它们的频道事件。若希望它们也实时落盘，同样在其派发 prompt 写上那两行 + 汇报要求（它们是全工具，report 可调）。
+
 每个派发 prompt 的开头必须包含两行：
 
 ```
@@ -35,6 +37,7 @@ worker 名 <worker-N>
 - 返回 `status="events"`：逐条处理 `events`——`kind="done"` 表示该 worker 完成；`kind="blocked"` 需要你决策（留言纠偏可对其 SendMessage steer）。
 - 返回 `status="timeout"`：沉默检测命中，按下节处置。
 - 已消费的事件不会重复返回；需要回看历史用 `read_events({channel})`。需要专等某个 worker 时传 `worker` 参数（其它 worker 事件不被消费）。
+- **汇总或验收前，必须 `read_events` 补收频道**：完成通知只带最终摘要，里程碑过程与完整时间线只存在于频道锚工件里——不补收，审计链条就断在最后一环。普通唤醒（如单条完成通知到达时）不必次次补收。
 
 ## 沉默处置（三级递进）
 

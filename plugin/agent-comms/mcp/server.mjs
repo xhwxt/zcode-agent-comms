@@ -20,7 +20,7 @@ import crypto from 'node:crypto';
 
 const SPOOL_ROOT = process.env.AGENT_COMMS_SPOOL_ROOT
   || path.join(os.homedir(), '.zcode', 'agent-comms', 'spool');
-const VERSION = '0.2.5';
+const VERSION = '0.2.6';
 const POLL_MS = 400;
 const WAIT_DEFAULT_MS = 60000;
 const WAIT_MAX_MS = 240000; // 必须小于 plugin.json 的 timeoutMs(600000)，留清理余量

@@ -13,7 +13,7 @@
         "en": "Real-time main/subagent communication: bundled worker (full-tools executor) and scout (read-only recon) types with the reporting protocol baked in, plus wait-any-worker MCP tool with timeout summaries.",
         "zh-CN": "主/子代理实时互通：worker（全工具执行型）与 scout（只读核查型）自带三层边界汇报协议，配套 open_channel/report/wait_worker_event/read_events 工具实现任意 worker 聚合等待、沉默检测与锚工件审计。"
       },
-      "version": "0.2.5",
+      "version": "0.2.6",
       "author": { "name": "kanban-project" },
       "keywords": ["zcode", "plugin", "mcp", "multi-agent", "subagent", "communication"],
       "source": "./plugin/agent-comms"
