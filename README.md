@@ -19,12 +19,11 @@ ZCode already ships the hard pipes (SendMessage can steer a running subagent; su
 
 ### Install
 
-From a local marketplace (this repo root is one — see `plugin/marketplace.json`):
+**Official marketplace flow (recommended):** the repo root ships a ZCode marketplace manifest. In ZCode: Settings → Plugin Management → Discover → add `https://github.com/xhwxt/zcode-agent-comms` → install **Agent Comms**. The plugin is copied into ZCode's plugin cache and registered like any marketplace plugin — no local checkout needed.
 
-1. In ZCode: Settings → Plugin Management → Discover → add this repo's `plugin/` directory as a marketplace → install **Agent Comms**
-2. Or register manually: add the marketplace to `~/.zcode/cli/plugins/known_marketplaces.json` (or `extraKnownMarketplaces` in `~/.zcode/cli/config.json`), the plugin entry to `installed_plugins.json` with `installPath` pointing at `plugin/agent-comms`, and enable it under `plugins.enabledPlugins`
+**Dev flow:** register your repo checkout as a local directory marketplace (`plugins.extraKnownMarketplaces` in `~/.zcode/cli/config.json`) — edits to plugin files take effect immediately, no reinstall.
 
-> Note: `plugin.json` currently hardcodes an absolute path to the MCP server script (Windows). Edit `mcpServers.comms.args` if you relocate the repo. Portability fix is on the roadmap.
+Prerequisite: Node.js (≥18) on PATH. The MCP server is spawned as `node ${ZCODE_PLUGIN_ROOT}/mcp/server.mjs`; the `${ZCODE_PLUGIN_ROOT}` placeholder is expanded by ZCode to the plugin install root, so the repo can live anywhere.
 
 ### Usage (coordinator side)
 
@@ -61,7 +60,11 @@ ZCode 内核已有硬管道（SendMessage 可 steer 运行中的子代理；子�
 
 ### 安装与使用
 
-本仓库 `plugin/` 目录即本地市场：ZCode → 设置 → 插件管理 → 发现 → 添加本地市场目录 → 安装 **Agent Comms**。协调者侧用法见上方英文节的四步循环（插件自带 skill 会在派发场景自动触发引导）。注意 `plugin.json` 目前写死了 MCP 脚本的绝对路径（Windows），移动仓库后需修改 `mcpServers.comms.args`。
+**官方市场流程（推荐）**：仓库根自带 ZCode 市场清单。ZCode → 设置 → 插件管理 → 发现 → 添加 `https://github.com/xhwxt/zcode-agent-comms` → 安装 **Agent Comms**；插件会像市场插件一样被复制进 ZCode 的插件缓存注册，无需本地检出。
+
+**开发者流程**：把仓库检出注册为本地目录市场（`~/.zcode/cli/config.json` 的 `plugins.extraKnownMarketplaces`），改插件文件即时生效、无需重装。
+
+前置要求：PATH 上有 Node.js（≥18）。MCP 服务器以 `node ${ZCODE_PLUGIN_ROOT}/mcp/server.mjs` 启动，`${ZCODE_PLUGIN_ROOT}` 占位符由 ZCode 内核展开为插件安装根目录，仓库放哪都能跑。协调者侧用法见上方英文节的四步循环（插件自带 skill 会在派发场景自动触发引导）。
 
 ### 验证与文档
 
