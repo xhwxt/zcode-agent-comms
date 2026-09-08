@@ -1,13 +1,13 @@
 ---
 name: agent-comms
-description: 主代理派发 worker 子代理并需要实时收流/监督时使用：如何生成 comms 频道、派发 prompt 必须写哪两行、如何用 wait_worker_event 形成"等待-处理"循环、超时沉默怎么处置。当需要并行多个 worker、长任务进度监督、或用户要求实时汇报时触发。Use when dispatching worker subagents that need real-time streaming/supervision: channel creation, the two required dispatch-prompt lines, the wait_worker_event loop, and silence handling. Triggers on parallel workers, long-task progress monitoring, or real-time progress reporting.
+description: 主代理派发 worker 子代理并需要实时收流/监督时使用：如何生成 comms 频道、派发 prompt 必须写哪三行（频道/worker 名/令牌）、如何用 wait_worker_event 形成"等待-处理"循环、超时沉默怎么处置。当需要并行多个 worker、长任务进度监督、或用户要求实时汇报时触发。Use when dispatching worker subagents that need real-time streaming/supervision: channel creation, the three required dispatch-prompt lines (channel/worker/token), the wait_worker_event loop, and silence handling. Triggers on parallel workers, long-task progress monitoring, or real-time progress reporting.
 ---
 
 # agent-comms 协调者协议
 
 ## 开频道（每次任务批次第一步）
 
-调用 `mcp__plugin_agent-comms_comms__open_channel`（可带 slug 前缀，如 `fix-login`），用**它返回的带随机后缀的频道名**写进派发 prompt。不要自己起频道名——随机后缀保证多个主会话并发时不会串台。
+调用 `mcp__plugin_agent-comms_comms__open_channel`（可带 slug 前缀，如 `fix-login`），用**它返回的带随机后缀的频道名与令牌（token）**写进派发 prompt。不要自己起频道名——随机后缀保证多个主会话并发时不会串台，令牌保证其它会话或无令牌的代理动不了本频道（report/wait/read 都要带）。
 
 ## 派发
 
@@ -16,27 +16,29 @@ description: 主代理派发 worker 子代理并需要实时收流/监督时使�
 - **`agent-comms:worker`**——执行型（全工具：改代码/跑管线/动文件/联网/浏览器；已硬排除频道消费与孙代理派生）。改东西的任务用它。
 - **`agent-comms:scout`**——只读核查型（检索/读取/联网核实，不修改任何文件）。查证、勘察、交叉核验的任务用它。
 
-**混派非插件类型时**（如 agentA/agentsDS/general-purpose）：它们默认**不经频道**——进度只会经完成通知或 RespondToCoordinator 到达，不会出现在频道事件里，别等它们的频道事件。若希望它们也实时落盘，同样在其派发 prompt 写上那两行 + 汇报要求（它们是全工具，report 可调）。
+**混派非插件类型时**（如 agentA/agentsDS/general-purpose）：它们默认**不经频道**——进度只会经完成通知或 RespondToCoordinator 到达，不会出现在频道事件里，别等它们的频道事件。若希望它们也实时落盘，同样在其派发 prompt 写上那三行 + 汇报要求（它们是全工具，report 可调）。
 
-每个派发 prompt 的开头必须包含两行：
+每个派发 prompt 的开头必须包含三行：
 
 ```
 comms 频道 <channel>
 worker 名 <worker-N>
+comms 令牌 <token>
 ```
 
 - `<worker-N>`：每个 worker 唯一的名字（如 worker-1、worker-2），用于你在事件里识别谁在说话。
+- `<token>`：open_channel 返回值里的 `token`；report 缺它或不匹配会被服务端拒绝。
 
 ## 等待循环
 
-派发后尽快调用 `mcp__plugin_agent-comms_comms__wait_worker_event({channel, timeout_ms})`：
+派发后尽快调用 `mcp__plugin_agent-comms_comms__wait_worker_event({channel, token, timeout_ms})`：
 
 - 单次最长阻塞 240000ms；**没等齐就再次调用**，形成"等待→处理→再等待"循环。
 - **并发建议**：一批 worker ≤3 个——过多并行代理徒增成本与噪声，也容易撞平台并发上限。
 - **长批次的省 token 模式**：不需要紧盯进度时，可以不挂 wait——把 worker 全部后台派发后直接结束本回合，后台代理的完成通知与紧急消息会唤醒你。**代价要向用户说清：结束回合期间，worker 的例行里程碑报告不会唤醒你**（文件事件没有唤醒通道，这是内核设计边界），它们会留存在频道里，等你被完成通知/紧急消息/用户消息唤醒后用 wait 或 read_events 一次性补收；若用户想实时盯进度，保持 wait 循环不结束回合。
 - 返回 `status="events"`：逐条处理 `events`——`kind="done"` 表示该 worker 完成；`kind="blocked"` 需要你决策（留言纠偏可对其 SendMessage steer）。
 - 返回 `status="timeout"`：沉默检测命中，按下节处置。
-- 已消费的事件不会重复返回；需要回看历史用 `read_events({channel})`。需要专等某个 worker 时传 `worker` 参数（其它 worker 事件不被消费）。
+- 已消费的事件不会重复返回；需要回看历史用 `read_events({channel, token})`。需要专等某个 worker 时传 `worker` 参数（其它 worker 事件不被消费）。
 - **汇总或验收前，必须 `read_events` 补收频道**：完成通知只带最终摘要，里程碑过程与完整时间线只存在于频道锚工件里——不补收，审计链条就断在最后一环。普通唤醒（如单条完成通知到达时）不必次次补收。
 
 ## 沉默处置（三级递进）

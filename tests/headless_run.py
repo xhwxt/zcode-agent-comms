@@ -25,19 +25,35 @@ def load_api_key():
     return p["options"]["apiKey"]
 
 
+def _mask(text, api_key):
+    return (text or "").replace(api_key, "***MASKED***")
+
+
 def run(prompt, workdir=None, as_json=True, timeout=540):
-    env = {**os.environ, "ANTHROPIC_API_KEY": load_api_key()}
+    api_key = load_api_key()
+    env = {**os.environ, "ANTHROPIC_API_KEY": api_key}
     cmd = ["node", ZCODE_CJS, "--cwd", str(workdir or DEFAULT_WORKDIR)]
     if as_json:
         cmd.append("--json")
     cmd += ["--prompt", prompt]
-    r = subprocess.run(cmd, env=env, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=timeout)
+    try:
+        r = subprocess.run(cmd, env=env, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # 超时残余缓冲可能含密钥，不回显
+        raise SystemExit(f"[headless_run] 超时（>{timeout}s），进程已终止；输出缓冲不回显")
+    except FileNotFoundError as e:
+        raise SystemExit(f"[headless_run] 启动失败（node 或 zcode.cjs 不在预期位置）：{e}")
+    r.stdout = _mask(r.stdout, api_key)
+    r.stderr = _mask(r.stderr, api_key)
     return r
 
 
 def main():
     args = sys.argv[1:]
+    if not args or not args[0].strip():
+        print(__doc__)
+        sys.exit(2)
     prompt = args[0]
     workdir = None
     if "--cwd" in args:

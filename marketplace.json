@@ -8,12 +8,12 @@
         "en": "Agent Comms",
         "zh-CN": "子代理实时互通"
       },
-      "description": "Main/subagent real-time comms for ZCode: bundled worker (full-tools executor) and scout (read-only recon) agent types with reporting protocol baked into their system prompts, plus open_channel/report/wait_worker_event/read_events MCP tools (wait-any-worker, silence detection, auditable anchor artifacts).",
+      "description": "Main/subagent real-time comms for ZCode: bundled worker (full-tools executor) and scout (read-only recon) agent types with reporting protocol baked into their system prompts, plus open_channel/report/wait_worker_event/read_events MCP tools (wait-any-worker, per-channel token auth, silence detection, auditable anchor artifacts).",
       "description_i18n": {
-        "en": "Real-time main/subagent communication: bundled worker (full-tools executor) and scout (read-only recon) types with the reporting protocol baked in, plus wait-any-worker MCP tool with timeout summaries.",
-        "zh-CN": "主/子代理实时互通：worker（全工具执行型）与 scout（只读核查型）自带三层边界汇报协议，配套 open_channel/report/wait_worker_event/read_events 工具实现任意 worker 聚合等待、沉默检测与锚工件审计。"
+        "en": "Real-time main/subagent communication: bundled worker (full-tools executor) and scout (read-only recon) types with the reporting protocol baked in, plus wait-any-worker MCP tool with timeout summaries and per-channel token auth.",
+        "zh-CN": "主/子代理实时互通：worker（全工具执行型）与 scout（只读核查型）自带三层边界汇报协议，配套 open_channel/report/wait_worker_event/read_events 工具实现任意 worker 聚合等待、每频道令牌鉴权、沉默检测与锚工件审计。"
       },
-      "version": "0.2.6",
+      "version": "0.2.7",
       "author": { "name": "kanban-project" },
       "keywords": ["zcode", "plugin", "mcp", "multi-agent", "subagent", "communication"],
       "source": "./plugin/agent-comms"
